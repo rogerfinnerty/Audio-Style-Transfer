@@ -3,6 +3,8 @@ Mel spectrogram to audio
 
 from: https://www.kaggle.com/code/gaurav41/how-to-convert-audio-to-mel-spectrogram-to-audio/notebook
 
+model weights: https://www.dropbox.com/s/zdbfprugbagfp2w/20180510_mixture_lj_checkpoint_step000320000_ema.pth?dl=0
+
 """
 import os
 import numpy as np
