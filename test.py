@@ -411,11 +411,11 @@ model = build_model().to(device)
 model.load_state_dict(checkpoint["state_dict"])
 
 # output_audio has fs = 22 kHz
-spect = wav_to_mel_spectrogram('output_audio.wav', hp)
+spect = wav_to_mel_spectrogram('output_audio.wav', hp) # This makes it a spectrogram
 librosa.display.specshow(spect, sr=hparams.sample_rate, x_axis='time',
                          y_axis='hz', hop_length=hparams.hop_size, cmap='magma')
 c = spect[:128, :]
 print(c.shape)
 
-waveform = wavegen(model, c=c)
+waveform = wavegen(model, c=c) # This takes the spectrogram
 sf.write('reconstructed_audio.wav', waveform, 16000, 'PCM_24')
