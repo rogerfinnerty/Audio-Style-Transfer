@@ -7,15 +7,18 @@ from pathlib import Path
 from typing import Optional, Union
 
 import librosa
+from librosa.filters import mel
 import soundfile as sf
 import numpy as np
 import webrtcvad
+from scipy import signal
 from scipy.ndimage import binary_dilation
 
 int16_max = (2 ** 15) - 1
 
 
-def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], hp, source_sr: Optional[int] = None):
+def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], hp, duration, source_sr: Optional[int] = None
+                   ):
     """
     Applies preprocessing operations to a waveform either on disk or in memory such that
     The waveform will be resampled to match the data hyperparameters.
@@ -34,6 +37,11 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], hp, source_sr: Op
     else:
         wav = fpath_or_wav
 
+    # If clip is longer than duration, shorten
+    num_samples = source_sr * duration
+    if wav.shape[0] < num_samples:
+        wav = wav[:num_samples]
+
     # Resample the wav
     if source_sr is not None:
         # resample time series from original sample rate to target
@@ -45,7 +53,8 @@ def preprocess_wav(fpath_or_wav: Union[str, Path, np.ndarray], hp, source_sr: Op
     wav = trim_long_silences(wav, hp)
 
     # save preprocessed wav
-    sf.write('preprocessed_audio.wav', wav, 16000, 'PCM_24')
+    # sf.write('preprocessed_audio.wav', wav, 16000, 'PCM_24')
+    sf.write('preprocessed_audio.wav', wav, 22050, 'PCM_24')
 
     return wav
 
@@ -158,3 +167,84 @@ def compute_partial_slices(n_samples: int, hp):
         wav_slices = wav_slices[:-1]
 
     return wav_slices, mel_slices
+
+
+def pySTFT(x, fft_length=1024, hop_length=256):
+    """
+    this function returns spectrogram (short time fourier transform)
+    :param x: np array for the audio file
+    :param fft_length: fft length for fast fourier transform (https://www.youtube.com/watch?v=E8HeD-MUrjY)
+    :param hop_length: hop_length is the sliding overlapping window size normally fft//4 works the best
+    :return: spectrogram in the form of np array
+    """
+    x = np.pad(x, int(fft_length // 2), mode='reflect')
+
+    noverlap = fft_length - hop_length
+    shape = x.shape[:-1] + ((x.shape[-1] - noverlap) // hop_length, fft_length)
+    strides = x.strides[:-1] + (hop_length * x.strides[-1], x.strides[-1])
+    result = np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides)
+
+    # window of given type and length
+    fft_window = signal.get_window('hann', fft_length, fftbins=True)
+    # compute 1-dim discrete Fourier transform for real input
+    # result = np.fft.rfft(fft_window * result, n=fft_length).T
+
+    result = librosa.core.stft(x, n_fft=1024, hop_length=hop_length)
+
+    return np.abs(result)
+
+
+def butter_highpass(cutoff, fs, order=5):
+    """
+    high pass Butterworth digital filter
+    Params: 
+    - cutoff = cutoff freq of filter, frequencies below this value will be attenuated
+    - fs = sampling frequency of signal
+    """
+    nyq = 0.5 * fs  # Nyquist frequency
+    normal_cutoff = cutoff / nyq    # normalized cutoff frequency
+    b, a = signal.butter(order, normal_cutoff, btype='high', analog=False)
+    # b, a = numerator, denominator polynomials of IIR filter (infinite impulse response)
+    return b, a
+
+
+def shuffle_along_axis(a, axis):
+    """
+    :param a: nd array e.g. [40, 180, 80]
+    :param axis: array axis. e.g. 0
+    :return: a shuffled np array along the given axis
+    """
+    idx = np.random.rand(*a.shape).argsort(axis=axis)
+    return np.take_along_axis(a, idx, axis=axis)
+
+
+def wav_to_mel_spectrogram(wav, hp, duration):
+    """
+    Derives a mel spectrogram ready to be used by the encoder from a preprocessed audio waveform.
+    Note: this not a log-mel spectrogram.
+    """
+
+    # creating mel basis matrix: linear transform matrix
+    # to project FFT bins onto Mel-frequency bins
+    mel_basis = mel(sr=hp.audio.sampling_rate,  # sampling rate of signal
+                    n_fft=hp.audio.n_fft,       # num FFT components
+                    fmin=90,                    # lowest frequency (Hz) def: 90
+                    fmax=7600,                  # highest frequency (Hz) def: 7600
+                    n_mels=hp.audio.mel_n_channels).T   # num Mel bands to generate
+
+    min_level = np.exp(-100 / 20 * np.log(10))
+
+    # getting audio as a 1D np array
+    # added clipping --> 5 sec
+    pp_wav = preprocess_wav(wav, hp, duration, source_sr=22050)
+
+    # Compute spectrogram
+    spectrogram = pySTFT(pp_wav).T
+    # Convert to mel and normalize
+    mel_spect = np.dot(spectrogram, mel_basis)
+    d_db = 20 * np.log10(np.maximum(min_level, mel_spect)) - 16
+    norm_mel_spect = np.clip((d_db + 100) / 100, 0, 1)
+
+    return norm_mel_spect
+
+
