@@ -293,7 +293,7 @@ output_img.save('output_content1_style1.png')
 # imshow(output, title='Output Image')
 # plt.show()
 
-output_sr = Image.open('Results/pngs/output_sr_content1_style1.png')
+output_sr = Image.open('output_content1_style1.png')
 width, height = output_sr.size
 aspect_ratio = width/height
 
