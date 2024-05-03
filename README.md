@@ -8,7 +8,8 @@ Usage:
 1. Single Layer CNN (style transfer) with Griffin Lim algorithm (audio reconstruction):
 
 2. Neural style transfer with VGG backbone + WaveNet (audio reconstruction):
-python vgg-wavenet.py
+
+  '''python vgg-wavenet.py'''
 
 3. Neural style transfer with ViT backbone + WaveNet (audio reconstruction):
 
