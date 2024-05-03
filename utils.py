@@ -1,7 +1,10 @@
-"""audio style transfer"""
+"""
+Utils for VGG - WaveNet audio style transfer
+"""
 
 import numpy as np
 import torch
+import torchvision.transforms as transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 
@@ -24,6 +27,18 @@ def imshow(tensor, title=None):
     plt.imshow(array, cmap='gray')
     if title is not None:
         plt.title(title)
+
+def imshow_color(tensor, title=None):
+    """Show images"""
+    unloader = transforms.ToPILImage()  # reconvert into PIL image  
+
+    image = tensor.cpu().clone()    # we clone the tensor to not do changes on it
+    image = image.squeeze(0)        # remove the fake batch dimension
+    image = unloader(image)
+    plt.imshow(image)
+    if title is not None:
+        plt.title(title)
+    plt.pause(0.001)
 
 class DictWithDotNotation(dict):
     """
@@ -70,9 +85,9 @@ def mel_spect_to_image(spect, show=False, title=None, save=False, save_str=None)
         if title:
             plt.title(title)
 
-    # Save image 
+    # Save image
     if save:
-        gray_image.save(save_str)
+        gray_image.save(save_str, quality=95)
 
     return gray_image
 
@@ -93,6 +108,16 @@ def pad_style_img(content_img, style_img):
     img_style_pad = np.vstack((img_style_pad, img_style_rem))
 
     return img_style_pad
+
+def show_color_image(tensor):
+    # Convert the tensor to a NumPy array
+    numpy_array = tensor.numpy()
+
+    # Transpose the array to match Matplotlib's expected format (H x W x C)
+    numpy_array = numpy_array.transpose(1, 2, 0)
+
+    # Display the color image using Matplotlib
+    plt.imshow(numpy_array[0,:,:])
 
 # def rgb_to_grayscale(rgb):
 #     """Convert RGB image to grayscale by taking average of 3 channels"""

@@ -1,5 +1,6 @@
 """
-from: https://www.kaggle.com/code/gaurav41/how-to-convert-audio-to-mel-spectrogram-to-audio/notebook
+Raw audio reconstruction from spectrogram using WaveNet
+adapted from: https://www.kaggle.com/code/gaurav41/how-to-convert-audio-to-mel-spectrogram-to-audio/notebook
 """
 
 import torch

@@ -1,5 +1,5 @@
 """
-from: https://www.kaggle.com/code/gaurav41/how-to-convert-audio-to-mel-spectrogram-to-audio/notebook
+Audio utils for VGG - WaveNet audio style transfer
 """
 
 import struct

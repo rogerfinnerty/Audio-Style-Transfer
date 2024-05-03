@@ -1,21 +1,26 @@
-"""poopstring"""
+"""
+Audio Style Transfer 
+- neural style transfer with VGG backbone for combining content and style spectrograms 
+- WaveNet for audio generation conditioned on spectrogram data
+"""
 
 from __future__ import print_function
 
+import warnings
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
 
 from PIL import Image
-import matplotlib.pyplot as plt
+import soundfile as sf
 
 from torchvision.models import vgg19, VGG19_Weights
 import torchvision.transforms as transforms
 
-from utils import *
-from audio_utils import *
-from style_transfer import *
-from wavegen import *
-import warnings
+from utils import GetDictWithDotNotation, imshow, pad_style_img, mel_spect_to_image
+from audio_utils import wav_to_mel_spectrogram
+from style_transfer import run_style_transfer
+from wavegen import build_model, wavegen
 
 # Suppress all warnings
 warnings.filterwarnings("ignore")
@@ -132,7 +137,7 @@ hparam_dict = {
             'layers': 24,
             'stacks': 4,
             'residual_channels': 512,
-            'gate_channels': 512,  # split into 2 gropus internally for gated activation
+            'gate_channels': 512,  # split into 2 groups internally for gated activation
             'skip_out_channels': 256,
             'dropout': 1 - 0.95,
             'kernel_size': 3,
@@ -225,17 +230,21 @@ model = build_model(hparams).to(device)
 model.load_state_dict(checkpoint["state_dict"])
 
 # Create mel spectrograms from content, style audio
-duration = 5
-spect_content = wav_to_mel_spectrogram('LJ001-0001.wav', hp, duration)
-spect_style = wav_to_mel_spectrogram('british.wav', hp, duration)
+DURATION = 5
+CONTENT_PATH = 'test_data/content1.wav'
+STYLE_PATH = 'test_data/style2.wav'
+spect_content = wav_to_mel_spectrogram(CONTENT_PATH, hp, DURATION)
+spect_style = wav_to_mel_spectrogram(STYLE_PATH, hp, DURATION)
 
-# Pad style spectrogram to match shape of content
-spect_style = pad_style_img(spect_content, spect_style)
+if spect_style.shape[0] < spect_content.shape[0]:
+    spect_style = pad_style_img(spect_content, spect_style)
+else:
+    spect_content = pad_style_img(spect_style, spect_content)
 
-content_str = 'content.png'
-style_str = 'style.png'
-mel_spect_to_image(spect_content, save=True, save_str=content_str)
-mel_spect_to_image(spect_style, save=True, save_str=style_str)
+CONTENT_STR = 'content1.png'
+STYLE_STR = 'style1.png'
+mel_spect_to_image(spect_content, save=True, save_str=CONTENT_STR)
+mel_spect_to_image(spect_style, save=True, save_str=STYLE_STR)
 
 loader = transforms.Compose([
     # transforms.Resize(imsize),   # scale imported image
@@ -249,8 +258,10 @@ def image_loader(image_name):
     return image.to(device, torch.float)
 
 # Load images for style transfer
-style_img = image_loader(content_str).expand(-1,3,-1,-1)
-content_img = image_loader(style_str).expand(-1,3,-1,-1)
+style_img = image_loader(STYLE_STR).expand(-1,3,-1,-1)
+content_img = image_loader(CONTENT_STR).expand(-1,3,-1,-1)
+# style_img = image_loader('Results/pngs/style2_out.png')
+# content_img = image_loader('Results/pngs/content1_out.png')
 
 # Define cnn model
 cnn = vgg19(weights=VGG19_Weights.DEFAULT).features.eval()
@@ -261,21 +272,41 @@ cnn_normalization_std = torch.tensor([0.229, 0.224, 0.225]).to(device)
 
 content_layers_selected = ['conv_4']
 style_layers_selected = ['conv_1', 'conv_2', 'conv_3', 'conv_4', 'conv_5']
-style_weight=100000
+STYLE_WEIGHT=1000000
 input_img = content_img.clone().detach().requires_grad_(True)
 
 output = run_style_transfer(cnn, cnn_normalization_mean, cnn_normalization_std,
                             content_img, style_img, input_img, content_layers=content_layers_selected, 
-                            style_layers=style_layers_selected, device=device, num_steps=100, style_weight=style_weight)
+                            style_layers=style_layers_selected, device=device, num_steps=100, style_weight=STYLE_WEIGHT)
 
-# Reshape, convert to grayscale
+
+# Remove dummy batch dimension, convert to grayscale
 output = torch.mean(output.squeeze(0), dim=0)
+output_img = output.detach().numpy()
+output_img *= 255
+output_img = Image.fromarray(output_img.astype(np.uint8))
+output_img = output_img.convert('L')
+output_img.save('output_content1_style1.png')
 
 # Show new spectrogram
 # plt.figure()
-# imshow(torch.mean(output, dim=0), title='Output Image')
+# imshow(output, title='Output Image')
 # plt.show()
 
-waveform = wavegen(model, hparams, device, output[:128, :])
-output_str = 'transfer_audio.wav'
+output_sr = Image.open('Results/pngs/output_sr_content1_style1.png')
+width, height = output_sr.size
+aspect_ratio = width/height
+
+target_width = 80
+# Calculate the new width based on the target height
+target_height = int(aspect_ratio * target_width)
+
+# Resize the image
+output_sr = output_sr.resize((target_height, target_width))
+transform = transforms.ToTensor()
+output_sr = transform(output_sr).squeeze(0) # 2065, 280
+
+# waveform = wavegen(model, hparams, device, c=output_sr[:128, :])
+waveform = wavegen(model, hparams, device, c=output)
+output_str = 'Results/wavs/output_sr_content1_style2_v2.wav'
 sf.write(output_str, waveform, 16000, 'PCM_24')

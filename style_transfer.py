@@ -1,4 +1,6 @@
-"""style transfer using VGG style representation"""
+"""
+Style transfer using VGG style representation
+"""
 
 from __future__ import print_function
 
@@ -117,7 +119,8 @@ def run_style_transfer(cnn, normalization_mean, normalization_std,
     """Run the style transfer."""
     print('Building the style transfer model..')
     model, style_losses, content_losses = get_style_model_and_losses(cnn,
-        normalization_mean, normalization_std, style_img, content_img, content_layers, style_layers, device)
+        normalization_mean, normalization_std, style_img, 
+        content_img, content_layers, style_layers, device)
 
     optimizer = optim.Adam([input_img.requires_grad_()], lr=0.1, eps=1e-1)
 
