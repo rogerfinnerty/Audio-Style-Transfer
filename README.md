@@ -9,9 +9,9 @@
 
 2. Neural style transfer with VGG backbone + WaveNet (audio reconstruction):
 
-'''bash 
-python vgg-wavenet.py
-'''
+```bash
+$ python vgg-wavenet.py
+```
 
 3. Neural style transfer with ViT backbone + WaveNet (audio reconstruction):
 
