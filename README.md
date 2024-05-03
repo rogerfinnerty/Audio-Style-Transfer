@@ -24,7 +24,11 @@ $ python vgg-wavenet.py
 3. Neural style transfer with ViT backbone + WaveNet (audio reconstruction):
 
 ```bash
-$ jupyter vgg-wavenet.py
+$ jupyter Vision_Transformer.ipynb
 ```
 
 4. Neural style transfer with ResNet backbone + WaveNet (audio reconstruction):
+
+```bash
+$ jupyter EC523_FinalProject_Script_ResNet.ipynb
+```
